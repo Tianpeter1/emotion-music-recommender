@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>人脸情绪识别 · 歌曲推荐系统</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Vue 挂载点 -->
+  <div id="app"></div>
+
+  <!-- 依赖（已本地化，离线可用）：face-api.js 提供人脸/情绪识别，Vue3 提供框架 -->
+  <script src="lib/face-api.min.js"></script>
+  <script src="lib/vue.global.prod.js"></script>
+  <!-- 歌曲数据库（对象/数组组织） -->
+  <script src="js/songs.js"></script>
+  <!-- 主程序 -->
+  <script src="js/app.js"></script>
+</body>
+</html>
