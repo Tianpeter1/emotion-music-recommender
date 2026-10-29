@@ -198,10 +198,62 @@ createApp({
 
     /* =========================================================
      * 5) 依据情绪推荐歌曲
+     *    推荐算法分两路：
+     *      ① 本地曲库召回：情绪 → LOCAL_SONGS[情绪]（已下载 MP3，离线可完整播放）
+     *      ② 在线 API 召回：情绪 → ONLINE_KEYWORDS[情绪] → iTunes Search API 实时检索
+     *    两路并行，本地优先展示，在线结果异步补齐。
      * ========================================================= */
+    let onlineSeq = 0;   // 用于丢弃过期请求（用户快速切换情绪时）
+
     function recommend(emotionKey) {
-      const list = (window.SONG_DB && SONG_DB[emotionKey]) || [];
-      recommendations.value = list.slice(0, 8);
+      // ① 本地曲库：按情绪键直接映射
+      const localMap = window.LOCAL_SONGS || {};
+      localSongs.value = (localMap[emotionKey] || []).map(s => Object.assign({}, s));
+
+      // ② 推荐文案库（保留给「手动选择情绪」与扩展用）
+      recommendations.value = ((window.SONG_DB && SONG_DB[emotionKey]) || []).slice(0, 8);
+
+      // ③ 在线检索
+      fetchOnline(emotionKey);
+    }
+
+    async function fetchOnline(emotionKey) {
+      const seq = ++onlineSeq;
+      const words = (window.ONLINE_KEYWORDS || {})[emotionKey] || [];
+      onlineSongs.value = [];
+      if (!words.length) { onlineLoading.value = false; return; }
+
+      onlineLoading.value = true;
+      // 注意：中国区 iTunes（country=cn）不返回 previewUrl（无 30s 试听），
+      // 必须用 us / hk / tw 才能拿到可播放的预览链接。
+      const COUNTRY = 'us';
+      let results = [];
+      let usedTerm = words[0];
+
+      // 依次尝试该情绪的关键词，直到拿到带预览链接的结果
+      for (const term of words) {
+        try {
+          const url = 'https://itunes.apple.com/search?term=' + encodeURIComponent(term) +
+                      '&media=music&limit=10&country=' + COUNTRY;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (seq !== onlineSeq) return;   // 已切换到别的情绪，丢弃本次结果
+          const usable = (data.results || []).filter(r => r.previewUrl);
+          if (usable.length) { results = usable; usedTerm = term; break; }
+        } catch (e) {
+          console.warn('在线检索失败（关键词 ' + term + '）：', e);
+        }
+      }
+
+      if (seq !== onlineSeq) return;
+      onlineSongs.value = results.slice(0, 6).map(r => ({
+        title: r.trackName,
+        artist: r.artistName,
+        previewUrl: r.previewUrl,
+        trackViewUrl: r.trackViewUrl,
+        reason: '按「' + EMOTIONS[emotionKey].label + '」情绪从 iTunes 实时检索：' + usedTerm
+      }));
+      onlineLoading.value = false;
     }
 
     /* =========================================================
@@ -209,6 +261,30 @@ createApp({
      * ========================================================= */
     function pickImage() { imageInput.value.click(); }
     function pickVideo() { videoInput.value.click(); }
+
+    /* 点选「演示照片」：与上传图片走完全一致的识别流程 */
+    function loadDemoPhoto(p) {
+      if (!p || !p.src) return;
+      stopMedia(true);
+      status.value = '正在识别演示照片…';
+      const img = new Image();
+      img.onload = () => {
+        mediaSource = { type: 'image', img };
+        source.value = 'image';
+        isLive.value = false;
+        drawFrameToStage();
+        detectOnStage().then(dets => {
+          drawFrameToStage();
+          drawBoxes(dets);
+          updateResult(dets);
+        }).catch(err => {
+          console.error(err);
+          status.value = '识别出错：' + (err && err.message ? err.message : err);
+        });
+      };
+      img.onerror = () => { status.value = '演示照片加载失败：' + p.src; };
+      img.src = p.src;
+    }
 
     function onImageChange(e) {
       const file = e.target.files && e.target.files[0];
@@ -328,6 +404,10 @@ createApp({
         dominant.value = '';
         faceCount.value = 0;
         recommendations.value = [];
+        localSongs.value = [];
+        onlineSongs.value = [];
+        onlineLoading.value = false;
+        onlineSeq++;            // 使进行中的在线请求失效
         lastBoxes = [];
         if (ctx && stage.value) ctx.clearRect(0, 0, stage.value.width, stage.value.height);
         status.value = '已停止。可重新选择获取方式。';
@@ -489,8 +569,8 @@ createApp({
       </section>
     </div>
 
-    <section class="panel reco-panel" v-if="localSongs.length || onlineSongs.length || onlineLoading">
-      <h2 class="panel-title">③ 为你推荐的歌曲 · {{ emotionMeta.label }}</h2>
+    <section class="panel reco-panel" v-if="dominant && (localSongs.length || onlineSongs.length || onlineLoading)">
+      <h2 class="panel-title">③ 为你推荐的歌曲 · {{ emotionMeta ? emotionMeta.label : '' }}</h2>
 
       <h3 class="sub">📁 本地曲库（已下载到本地，离线可完整播放）</h3>
       <div class="song-grid">
@@ -507,6 +587,7 @@ createApp({
 
       <h3 class="sub">🌐 在线推荐（iTunes API 实时检索）</h3>
       <div v-if="onlineLoading" class="empty-hint">正在从在线音乐库检索…</div>
+      <div v-else-if="!onlineSongs.length" class="empty-hint">在线曲库暂时没检索到结果（可能是网络受限），本地曲库仍可正常播放。</div>
       <div class="song-grid" v-else>
         <div class="song-card" v-for="song in onlineSongs" :key="song.trackViewUrl" :style="{ borderTopColor: emotionMeta.color }">
           <div class="song-top">
