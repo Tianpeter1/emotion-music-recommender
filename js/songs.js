@@ -112,13 +112,13 @@ const SONG_DB = {
 
 // ===== 5. 演示照片（本地生成的多情绪人脸，方便选择演示）=====
 const DEMO_PHOTOS = [
-  { emotion:'happy',     src:'test-samples/happy.png',     label:'😄 开心' },
-  { emotion:'neutral',   src:'test-samples/neutral.png',   label:'😐 平静' },
-  { emotion:'sad',       src:'test-samples/sad.png',       label:'😢 难过' },
-  { emotion:'angry',     src:'test-samples/angry.png',     label:'😠 愤怒' },
-  { emotion:'fearful',   src:'test-samples/fearful.png',   label:'😨 害怕' },
-  { emotion:'surprised', src:'test-samples/surprised.png', label:'😲 惊讶' },
-  { emotion:'disgusted', src:'test-samples/disgusted.png', label:'🤢 厌恶' }
+  { emotion:'happy',     src:'test-samples/happy.jpg',     label:'😄 开心' },
+  { emotion:'neutral',   src:'test-samples/neutral.jpg',   label:'😐 平静' },
+  { emotion:'sad',       src:'test-samples/sad.jpg',       label:'😢 难过' },
+  { emotion:'angry',     src:'test-samples/angry.jpg',     label:'😠 愤怒' },
+  { emotion:'fearful',   src:'test-samples/fearful.jpg',   label:'😨 害怕' },
+  { emotion:'surprised', src:'test-samples/surprised.jpg', label:'😲 惊讶' },
+  { emotion:'disgusted', src:'test-samples/disgusted.jpg', label:'🤢 厌恶' }
 ];
 
 // 暴露到全局，供 app.js 使用（无打包工具的传统脚本写法）
