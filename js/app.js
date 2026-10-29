@@ -89,7 +89,7 @@ createApp({
         await faceapi.nets.tinyFaceDetector.loadFromUri(uri);
         await faceapi.nets.faceExpressionNet.loadFromUri(uri);
       };
-      status.value = '正在加载人脸情绪模型…';
+      status.value = '正在加载人脸情绪模型…（首次约需 10~30 秒，加载完即可使用）';
       try {
         // 优先本地模型（离线可用，需通过本地服务器访问）
         await tryLoad(LOCAL);
