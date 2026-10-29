@@ -217,6 +217,36 @@ createApp({
       fetchOnline(emotionKey);
     }
 
+    /* iTunes Search API 原生支持 JSONP（callback 参数）。
+     * 浏览器直接 fetch 它会被 CORS 拦（302 重定向会丢 Access-Control-Allow-Origin），
+     * 用 JSONP 通过 <script> 加载可稳定拿到数据。 */
+    function jsonpSearch(url, timeoutMs) {
+      return new Promise(function (resolve, reject) {
+        const cb = '__itunes_cb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+        const script = document.createElement('script');
+        let settled = false;
+        const timer = setTimeout(function () {
+          if (settled) return;
+          settled = true; cleanup(); reject(new Error('JSONP 超时'));
+        }, timeoutMs || 9000);
+        function cleanup() {
+          clearTimeout(timer);
+          try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+        window[cb] = function (data) {
+          if (settled) return;
+          settled = true; cleanup(); resolve(data);
+        };
+        script.onerror = function () {
+          if (settled) return;
+          settled = true; cleanup(); reject(new Error('JSONP 加载失败'));
+        };
+        script.src = url + '&callback=' + cb;
+        document.head.appendChild(script);
+      });
+    }
+
     async function fetchOnline(emotionKey) {
       const seq = ++onlineSeq;
       const words = (window.ONLINE_KEYWORDS || {})[emotionKey] || [];
@@ -235,8 +265,7 @@ createApp({
         try {
           const url = 'https://itunes.apple.com/search?term=' + encodeURIComponent(term) +
                       '&media=music&limit=10&country=' + COUNTRY;
-          const res = await fetch(url);
-          const data = await res.json();
+          const data = await jsonpSearch(url, 9000);
           if (seq !== onlineSeq) return;   // 已切换到别的情绪，丢弃本次结果
           const usable = (data.results || []).filter(r => r.previewUrl);
           if (usable.length) { results = usable; usedTerm = term; break; }
